@@ -73,6 +73,28 @@ object Application3 extends ReactiveMongoAutoSourceController[Person] {
 
   val coll = db.collection[JSONCollection]("persons")
 
+  override def insert: EssentialAction = Action(parse.json) { request =>
+    Json.fromJson[Person](request.body)(reader).map { t =>
+      Async {
+        res.insert(t).map { id =>
+          val jsId = Json.toJson(id)(idWriter)
+          val jsPerson = Person.fmt.writes(t)
+          val json = jsPerson + ("id" -> jsId)
+
+          Ok(json)
+        }
+      }
+    }.recoverTotal { e => BadRequest(JsError.toFlatJson(e)) }
+  }
+
+  override def update(id: BSONObjectID): EssentialAction = Action(parse.json) { request =>
+    Json.fromJson[Person](request.body)(reader).map { t =>
+      Async {
+        res.update(id, t).map { _ => NoContent }
+      }
+    }.recoverTotal { e => BadRequest(JsError.toFlatJson(e)) }
+  }
+
   override def delete(id: BSONObjectID) = Authenticated { _ =>
     super.delete(id)
   }
